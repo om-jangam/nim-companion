@@ -1,0 +1,405 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!-- Only Nim's own scripts and styles run here: no remote code, no inline
+     script, no plugins, and the page cannot be pointed anywhere else. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+<title>Nim</title>
+<style>
+  /* The page stays fully transparent or the window shows up as a grey box over
+     your desktop. Only the creature, its bubble and the island are painted. */
+  :root {
+    --ink:    rgba(13, 17, 28, 0.92);
+    --line:   rgba(150, 190, 255, 0.16);
+    --text:   #e9ecf6;
+    --dim:    #8b95ad;
+    --cyan:   #5fd8ff;
+    --violet: #c08cff;
+    --amber:  #ffc46b;
+    --green:  #6ee7a8;
+    --red:    #ff7b92;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%;
+    background: transparent; overflow: hidden;
+    user-select: none; cursor: default;
+    font: 13px/1.45 ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+    color: var(--text);
+  }
+
+  /* Nim keeps a box of its own, pinned bottom-right at a fixed size, so the
+     window can grow for the island without the creature changing size. */
+  #nim {
+    position: absolute; right: 0; bottom: 0;
+    width: 320px; height: 430px;
+    transition: opacity .25s ease;
+  }
+  /* the cursor passing over while you work: see-through, so what is under it shows */
+  #nim.ghost { opacity: .2; }
+
+  /* ---- the floating surface: the light above Nim's head, grown into words ----
+     Its size and position are springs driven from surface.js; CSS only styles
+     the content. It exists only while Nim has something to say. */
+  #surface-layer { position: absolute; inset: 0; pointer-events: none; }
+  .surface-thread {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    pointer-events: none; overflow: visible;
+  }
+  .surface-thread path { fill: none; stroke: var(--cyan); stroke-width: 1.2; stroke-linecap: round; }
+  /* glass with a thin gradient edge; the edge takes the colour of the moment */
+  .surface {
+    --edge: linear-gradient(120deg, rgba(95,216,255,.6), rgba(192,140,255,.5) 55%, rgba(255,140,200,.45));
+    position: absolute; left: 0; top: 0; overflow: hidden; pointer-events: auto;
+    background: linear-gradient(rgba(14,16,30,.80), rgba(14,16,30,.80)) padding-box, var(--edge) border-box;
+    border: 1px solid transparent;
+    box-shadow: 0 8px 26px rgba(0,0,0,.40), 0 0 20px rgba(140,120,255,.14);
+    backdrop-filter: blur(14px) saturate(1.4);
+    will-change: transform, width, height, opacity;
+  }
+  .surface[data-mode="confirm"] { --edge: linear-gradient(120deg, rgba(255,196,107,.85), rgba(255,140,120,.6)); box-shadow: 0 8px 26px rgba(0,0,0,.45), 0 0 22px rgba(255,196,107,.20); }
+  .surface[data-mode="error"]   { --edge: linear-gradient(120deg, rgba(255,123,146,.8), rgba(255,160,120,.5)); }
+  .surface[data-mode="done"]    { --edge: linear-gradient(120deg, rgba(110,231,168,.75), rgba(95,216,255,.5)); }
+  .surface-inner {
+    position: absolute; left: 0; top: 0; padding: 9px 13px 10px;
+    width: max-content; max-width: 290px;
+  }
+  .surface-row { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+  .surface-glyph { width: 15px; flex: none; text-align: center; color: var(--cyan); font-size: 13px; }
+  .surface[data-mode="done"] .surface-glyph,
+  .surface[data-mode="confirm"] .surface-glyph {
+    width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 700;
+  }
+  .surface[data-mode="done"] .surface-glyph { background: rgba(110,231,168,.18); animation: pop .35s cubic-bezier(.2,.9,.3,1.5); }
+  .surface[data-mode="confirm"] .surface-glyph { background: rgba(255,196,107,.18); }
+  @keyframes pop { from { transform: scale(.3); } to { transform: scale(1); } }
+  .surface[data-mode="thinking"] .surface-glyph,
+  .surface[data-mode="hearing"] .surface-glyph { color: var(--violet); animation: spin 1.1s linear infinite; }
+  .surface[data-mode="listening"] .surface-glyph { animation: breathe 1.2s ease-in-out infinite; }
+  .surface[data-mode="working"] .surface-glyph { color: var(--amber); animation: breathe .9s ease-in-out infinite; }
+  .surface[data-mode="confirm"] .surface-glyph { color: var(--amber); }
+  .surface[data-mode="done"] .surface-glyph { color: var(--green); }
+  .surface[data-mode="error"] .surface-glyph { color: var(--red); font-weight: 700; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .surface-title { font-size: 13px; font-weight: 600; letter-spacing: .1px; color: var(--text); overflow: hidden; text-overflow: ellipsis; }
+  .surface[data-mode="confirm"] .surface-title { white-space: normal; max-width: 250px; font-weight: 600; }
+  .surface-meta { font-size: 11px; color: var(--dim); margin-left: auto; padding-left: 10px; }
+  .surface-detail {
+    font-size: 12px; line-height: 1.42; color: #a9b3c9; margin-top: 3px;
+    white-space: normal; word-break: break-word; max-width: 264px; max-height: 7.2em; overflow: hidden;
+  }
+  .surface[data-mode="reply"] .surface-detail { margin-top: 0; font-size: 13px; color: var(--text); }
+  .surface-meter { display: flex; gap: 3px; align-items: flex-end; height: 18px; margin-top: 6px; width: 190px; }
+  .surface-meter i { flex: 1; background: var(--cyan); border-radius: 2px; height: 10%; opacity: .85; transition: height .08s linear; }
+  .surface-bar { height: 3px; border-radius: 3px; background: rgba(255,255,255,.08); overflow: hidden; margin-top: 7px; width: 230px; }
+  .surface-bar > i { display: block; height: 100%; width: 0; background: var(--cyan); transition: width .35s ease; }
+  .surface[data-mode="done"] .surface-bar > i { background: var(--green); }
+  .surface-actions { display: flex; gap: 6px; margin-top: 8px; justify-content: flex-end; }
+  .surface-btn { padding: 4px 13px; font-size: 12px; }
+  .surface-btn.approve { border-color: rgba(110,231,168,.55); color: var(--green); }
+  .surface-btn.deny { border-color: rgba(255,123,146,.45); color: var(--red); }
+  .surface-input {
+    display: block; width: 264px; margin-top: 8px; padding: 7px 10px;
+    border-radius: 10px; border: 1px solid var(--line);
+    background: rgba(255,255,255,.06); color: #fff; font: inherit; outline: none; user-select: text;
+  }
+  .surface-input:focus { border-color: rgba(150,215,255,.6); }
+
+  /* ---- the island: Nim's expanded self ----------------------------------- */
+  #island {
+    position: absolute; left: 14px; top: 14px; right: 14px;
+    padding: 13px 14px 12px;
+    border-radius: 18px;
+    background: var(--ink); border: 1px solid var(--line);
+    box-shadow: 0 16px 44px rgba(0,0,0,.55);
+    backdrop-filter: blur(10px);
+    opacity: 0; transform: translateY(10px) scale(.96);
+    transform-origin: 78% 100%;
+    transition: opacity .2s ease, transform .26s cubic-bezier(.2,.9,.3,1.25);
+    pointer-events: none;
+  }
+  #island.open { opacity: 1; transform: none; pointer-events: auto; }
+
+  .head { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; }
+  .pip { width: 8px; height: 8px; border-radius: 50%; background: var(--dim); flex: none; }
+  .pip.listening, .pip.working { background: var(--cyan); box-shadow: 0 0 10px var(--cyan); }
+  .pip.planning  { background: var(--violet); box-shadow: 0 0 10px var(--violet); }
+  .pip.waiting   { background: var(--amber); box-shadow: 0 0 10px var(--amber); }
+  .pip.completed { background: var(--green); box-shadow: 0 0 10px var(--green); }
+  .pip.error     { background: var(--red); box-shadow: 0 0 10px var(--red); }
+  .pip.pulse     { animation: breathe 1.4s ease-in-out infinite; }
+  @keyframes breathe { 0%,100% { opacity: 1 } 50% { opacity: .35 } }
+
+  .status {
+    font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase;
+    color: var(--dim); margin-right: auto;
+  }
+  .goal {
+    font-size: 13.5px; line-height: 1.35; margin: 0 0 10px;
+    word-break: break-word;
+  }
+
+  .bar { height: 3px; border-radius: 3px; background: rgba(255,255,255,.08); overflow: hidden; }
+  .bar > i { display: block; height: 100%; width: 0; background: var(--cyan); transition: width .3s ease; }
+  .bar.done > i { background: var(--green); }
+  .bar.bad  > i { background: var(--red); }
+  .count { font-size: 11px; color: var(--dim); margin: 6px 0 9px; }
+
+  .steps { list-style: none; margin: 0 0 10px; padding: 0; max-height: 148px; overflow-y: auto; }
+  .steps li {
+    display: flex; gap: 8px; align-items: flex-start;
+    padding: 3px 0; font-size: 12.5px; color: var(--dim);
+  }
+  .steps li .mark { width: 13px; flex: none; text-align: center; }
+  .steps li.running { color: var(--text); }
+  .steps li.done    { color: #aeb8cc; }
+  .steps li.failed  { color: var(--red); }
+  .steps li.awaiting-approval { color: var(--amber); }
+  .steps li .sum { display: block; font-size: 11px; color: #6d788f; }
+  .steps li .sum.proven { color: #5fbf8e; }
+  .steps li em.risk {
+    font-style: normal; font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase;
+    margin-left: 6px; padding: 0 5px; border-radius: 4px; vertical-align: 1px;
+  }
+  em.risk.medium   { color: var(--amber); border: 1px solid rgba(255,196,107,.4); }
+  em.risk.high     { color: var(--red);   border: 1px solid rgba(255,123,146,.45); }
+  em.risk.critical { color: #fff; background: rgba(255,123,146,.5); }
+
+  .ask-approval {
+    border: 1px solid rgba(255,196,107,.4); background: rgba(255,196,107,.08);
+    border-radius: 11px; padding: 9px 11px; margin-bottom: 10px; font-size: 12.5px;
+  }
+  .ask-approval b { display: block; margin-bottom: 5px; color: var(--amber); font-weight: 600; }
+
+  .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  button {
+    appearance: none; cursor: pointer; color: var(--text);
+    background: rgba(150,190,255,.08); border: 1px solid var(--line);
+    border-radius: 999px; padding: 5px 12px; font: inherit; font-size: 12px;
+  }
+  button:hover { background: rgba(150,215,255,.18); }
+  button.go  { border-color: rgba(110,231,168,.5); color: var(--green); }
+  button.no  { border-color: rgba(255,123,146,.45); color: var(--red); }
+
+  #result {
+    display: none; margin-top: 9px; padding: 9px 11px;
+    background: rgba(255,255,255,.04); border-radius: 11px;
+    font-size: 12px; color: #c3cada; white-space: pre-wrap;
+    max-height: 120px; overflow-y: auto;
+  }
+  #result.show { display: block; }
+
+  #goalInput {
+    width: 100%; margin-top: 10px; padding: 9px 11px;
+    border-radius: 11px; border: 1px solid var(--line);
+    background: rgba(255,255,255,.05); color: #fff;
+    font: inherit; outline: none; user-select: text;
+  }
+  #goalInput:focus { border-color: rgba(150,215,255,.6); background: rgba(255,255,255,.08); }
+
+  /* ---- the Dots: a small row under the creature, only while it is using
+     something; clickable only where drawn ---------------------------------- */
+  #dots { position: absolute; inset: 0; pointer-events: none; }
+  .nim-dot {
+    position: absolute; left: 0; top: 0; width: 10px; height: 10px; padding: 0;
+    border-radius: 50%; border: 1px solid rgba(255,255,255,.35); cursor: pointer; pointer-events: auto;
+    background: var(--c);
+    transition: opacity .3s, box-shadow .3s;
+  }
+  .nim-dot:hover { background: var(--c); box-shadow: 0 0 0 3px rgba(255,255,255,.18); }
+  /* its name, on hover */
+  .nim-dot::after {
+    content: attr(data-name); position: absolute; left: 50%; top: 15px; transform: translateX(-50%);
+    padding: 1px 7px; border-radius: 7px; background: var(--ink); color: var(--text);
+    font-size: 10.5px; white-space: nowrap; opacity: 0; transition: opacity .15s; pointer-events: none;
+  }
+  .nim-dot:hover::after { opacity: 1; }
+  .nim-dot[data-status="active"] { animation: dotglow 1.6s ease-in-out infinite; }
+  .nim-dot[data-status="waiting"] { box-shadow: 0 0 0 2px #ffc46b; }
+  .nim-dot[data-status="done"] { opacity: .8; }
+  .nim-dot[data-status="failed"] { box-shadow: 0 0 0 2px #ff7b92; }
+  @keyframes dotglow { 0%,100% { opacity: .65; } 50% { opacity: 1; } }
+  .dot-card {
+    position: absolute; left: 0; top: 0; width: 200px; pointer-events: auto;
+    padding: 10px 12px; border-radius: 13px; background: var(--ink);
+    border: 1px solid var(--line); border-left: 3px solid var(--c);
+    box-shadow: 0 10px 28px rgba(0,0,0,.5); font-size: 12px;
+  }
+  .dot-card b { font-weight: 600; }
+  .dot-card .sub { color: var(--dim); font-size: 11px; }
+  .dot-card .st { color: var(--c); margin-top: 3px; }
+  .dot-card .now { color: var(--dim); margin-top: 2px; }
+  .dot-card .acts { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .dot-card .acts button { padding: 3px 10px; font-size: 11.5px; }
+
+  #mic.on { background: rgba(95,216,255,.22); border-color: rgba(95,216,255,.6); }
+
+  /* ---- looking after you: the focus pill, the clipboard offer, the quiz ----- */
+  .life-pill {
+    position: absolute; left: 0; top: 0; display: flex; align-items: center; gap: 6px;
+    padding: 4px 6px 4px 10px; border-radius: 999px; pointer-events: auto; white-space: nowrap;
+    background:
+      linear-gradient(rgba(14,16,30,.82), rgba(14,16,30,.82)) padding-box,
+      linear-gradient(120deg, rgba(95,216,255,.6), rgba(192,140,255,.5) 55%, rgba(255,140,200,.45)) border-box;
+    border: 1px solid transparent; box-shadow: 0 6px 20px rgba(0,0,0,.40); backdrop-filter: blur(14px) saturate(1.4);
+    font-size: 12px; color: #e9ecf6; opacity: 0; visibility: hidden; transform: scale(.9);
+    transition: opacity .2s ease, transform .25s cubic-bezier(.2,.9,.3,1.4);
+  }
+  .life-pill.show { opacity: 1; visibility: visible; }
+  .life-pill button { padding: 2px 9px; font-size: 11.5px; }
+  .life-pill #focus-time { font-variant-numeric: tabular-nums; font-weight: 600; min-width: 38px; }
+  .life-pill.break { border-color: rgba(110,231,168,.5); }
+  .life-pill.clip { flex-wrap: wrap; justify-content: center; max-width: 290px; border-radius: 14px; padding: 6px 8px; row-gap: 5px; }
+  .life-pill.clip .what { color: #aab4cc; width: 100%; text-align: center; }
+  .life-pill.offer .what { color: #e9ecf6; white-space: normal; line-height: 1.35; padding: 0 4px; }
+  .life-pill.offer button[data-habit="yes"] { background: linear-gradient(135deg, #5fd8ff, #c08cff); color: #0d1020; border: 0; font-weight: 700; }
+  .life-pill.quiet #quiet-text { color: #c9d1e3; }
+  .quiz-card {
+    position: absolute; left: 8px; right: 8px; top: 8px; padding: 10px 12px 12px; border-radius: 14px; pointer-events: auto;
+    background: rgba(10,13,22,.95); border: 1px solid rgba(150,190,255,.3); box-shadow: 0 10px 28px rgba(0,0,0,.55);
+    opacity: 0; visibility: hidden; transition: opacity .2s ease; z-index: 6;
+  }
+  .quiz-card.show { opacity: 1; visibility: visible; }
+  .quiz-head { display: flex; justify-content: space-between; align-items: center; color: #8b95ad; font-size: 11px; margin-bottom: 6px; }
+  .quiz-head button { padding: 0 8px; }
+  .quiz-q { font-size: 13.5px; line-height: 1.38; margin-bottom: 8px; }
+  .quiz-opts { display: grid; gap: 5px; }
+  .quiz-opts button { text-align: left; border-radius: 10px; padding: 6px 10px; white-space: normal; line-height: 1.3; }
+  .quiz-opts button.right { border-color: rgba(110,231,168,.8); background: rgba(110,231,168,.18); }
+  .quiz-opts button.wrong { border-color: rgba(255,123,146,.8); background: rgba(255,123,146,.16); }
+  .quiz-why { font-size: 11.5px; color: #aab4cc; margin-top: 7px; min-height: 1em; }
+
+  /* ---- music controls on its belly, while something is playing ------------
+     A small glass pill: a live equalizer, the three transport buttons around a
+     glowing play button, and volume. Only CSS animates here - nothing per frame. */
+  .media-bar {
+    position: absolute; left: 0; top: 0; display: flex; align-items: center; gap: 3px;
+    padding: 4px 6px 4px 9px; border-radius: 999px; pointer-events: auto;
+    background:
+      linear-gradient(rgba(14,16,30,.78), rgba(14,16,30,.78)) padding-box,
+      linear-gradient(120deg, rgba(95,216,255,.65), rgba(192,140,255,.55) 55%, rgba(255,140,200,.5)) border-box;
+    border: 1px solid transparent;
+    box-shadow: 0 6px 22px rgba(0,0,0,.42), 0 0 18px rgba(140,120,255,.18);
+    backdrop-filter: blur(14px) saturate(1.4);
+    opacity: 0; visibility: hidden; transition: opacity .2s ease;
+  }
+  .media-bar.show { opacity: 1; visibility: visible; }
+  .media-bar button {
+    width: 26px; height: 26px; padding: 0; border: none; border-radius: 50%;
+    background: transparent; color: rgba(233,236,246,.82); display: grid; place-items: center; cursor: pointer;
+    transition: background .15s, color .15s, transform .12s;
+  }
+  .media-bar button:hover { background: rgba(255,255,255,.10); color: #fff; }
+  .media-bar button:active { transform: scale(.86); }
+  .media-bar button.main {
+    width: 32px; height: 32px; margin: 0 2px; color: #0d1020;
+    background: linear-gradient(135deg, #5fd8ff, #c08cff);
+    box-shadow: 0 0 14px rgba(150,140,255,.55);
+  }
+  .media-bar button.main:hover { color: #0d1020; filter: brightness(1.1); background: linear-gradient(135deg, #5fd8ff, #c08cff); }
+  .media-bar svg { width: 14px; height: 14px; fill: currentColor; }
+  .media-bar button.main svg { width: 15px; height: 15px; }
+  .media-bar .ic-play { display: none; }
+  .media-bar.paused .ic-play { display: inline; }
+  .media-bar.paused .ic-pause { display: none; }
+  .media-bar.paused button.main { box-shadow: none; }
+  .media-bar .sep { width: 1px; height: 16px; background: rgba(255,255,255,.12); margin: 0 3px; }
+  .media-bar .vol {
+    font-size: 10.5px; font-variant-numeric: tabular-nums; color: #dfe5f5;
+    width: 0; overflow: hidden; text-align: center; transition: width .18s ease;
+  }
+  .media-bar .vol.on { width: 30px; }
+  /* the little live equalizer: dances while playing, rests when paused */
+  .media-bar .eq { display: flex; align-items: flex-end; gap: 2px; height: 12px; margin-right: 4px; }
+  .media-bar .eq i {
+    width: 3px; border-radius: 2px; height: 100%;
+    background: linear-gradient(#ff8cc8, #5fd8ff); transform-origin: bottom;
+    animation: eq 0.9s ease-in-out infinite;
+  }
+  .media-bar .eq i:nth-child(2) { animation-duration: .7s; animation-delay: -.3s; }
+  .media-bar .eq i:nth-child(3) { animation-duration: 1.1s; animation-delay: -.6s; }
+  .media-bar.paused .eq i { animation-play-state: paused; transform: scaleY(.3); }
+  @keyframes eq { 0%, 100% { transform: scaleY(.3); } 50% { transform: scaleY(1); } }
+</style>
+</head>
+<body>
+
+<div id="island">
+  <div class="head">
+    <span class="pip" id="pip"></span>
+    <span class="status" id="statusLabel">idle</span>
+    <button id="mic" title="speak to me (Ctrl+Alt+V)">&#127908;</button>
+    <button id="collapse" title="collapse">&times;</button>
+  </div>
+
+  <p class="goal" id="goal">What should I do?</p>
+
+  <div class="bar" id="bar"><i id="barFill"></i></div>
+  <div class="count" id="count"></div>
+
+  <div class="ask-approval" id="approval" style="display:none">
+    <b>Needs your approval</b>
+    <span id="approvalWhat"></span>
+    <div class="row" style="margin-top:8px">
+      <button class="go" id="approve">Approve</button>
+      <button class="no" id="deny">Skip it</button>
+    </div>
+  </div>
+
+  <ul class="steps" id="steps"></ul>
+
+  <div class="row" id="controls"></div>
+  <div id="result"></div>
+
+  <input id="goalInput" type="text" placeholder="give me something to do..."
+         autocomplete="off" spellcheck="false">
+</div>
+
+<canvas id="nim"></canvas>
+<div id="dots"></div>
+<div id="focus-pill" class="life-pill" aria-live="polite"><span class="ic">&#127919;</span><span id="focus-time">25:00</span><button id="focus-stop" title="Stop focusing">&times;</button></div>
+<div id="quiet-pill" class="life-pill quiet" aria-live="polite"><span class="ic">&#128277;</span><span id="quiet-text">Quiet</span><button id="quiet-stop" title="Talk again">&times;</button></div>
+<div id="habit-offer" class="life-pill clip offer" aria-live="polite">
+  <span class="what" id="habit-text"></span>
+  <button data-habit="yes">Yes, do it</button>
+  <button data-habit="later">Not now</button>
+  <button data-habit="no">No</button>
+</div>
+<div id="clip-offer" class="life-pill clip">
+  <span class="what" id="clip-what">Copied</span>
+  <button data-clip="summarize">Summarize</button>
+  <button data-clip="translate">Translate</button>
+  <button data-clip="fix">Fix grammar</button>
+  <button data-clip="close" title="No thanks">&times;</button>
+</div>
+<div id="quiz" class="quiz-card" aria-live="polite">
+  <div class="quiz-head"><span id="quiz-count">1 / 5</span><button id="quiz-close" title="Stop the quiz">&times;</button></div>
+  <div class="quiz-q" id="quiz-q"></div>
+  <div class="quiz-opts" id="quiz-opts"></div>
+  <div class="quiz-why" id="quiz-why"></div>
+</div>
+<div id="media-bar" class="media-bar" aria-label="music controls">
+  <span class="eq" aria-hidden="true"><i></i><i></i><i></i></span>
+  <button data-act="previous" title="Previous"><svg viewBox="0 0 24 24"><path d="M6 5h2v14H6zM19 5v14L9 12z"/></svg></button>
+  <button data-act="playpause" title="Play / pause" class="main"><svg viewBox="0 0 24 24"><path class="ic-pause" d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/><path class="ic-play" d="M8 5v14l11-7z"/></svg></button>
+  <button data-act="next" title="Next"><svg viewBox="0 0 24 24"><path d="M16 5h2v14h-2zM5 5v14l10-7z"/></svg></button>
+  <span class="sep"></span>
+  <button data-act="voldown" title="Volume down"><svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16 11.2h5v1.6h-5z"/></svg></button>
+  <span class="vol" id="media-vol"></span>
+  <button data-act="volup" title="Volume up"><svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M17.7 9.5h1.6v1.7H21v1.6h-1.7v1.7h-1.6v-1.7H16v-1.6h1.7z"/></svg></button>
+</div>
+<div id="surface-layer"></div>
+
+<script src="../companion/wardrobe.js"></script>
+<script src="../companion/groove.js"></script>
+<script src="../companion/nim.js"></script>
+<script src="mic.js"></script>
+<script src="wake.js"></script>
+<script src="dots.js"></script>
+<script src="surface-model.js"></script>
+<script src="surface.js"></script>
+<script src="music.js"></script>
+<script src="renderer.js"></script>
+</body>
+</html>

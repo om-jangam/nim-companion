@@ -1,0 +1,28 @@
+node_modules/
+dist/
+*.log
+
+# Electron keeps each service's cookies and local storage here; it is your
+# signed-in session and must never be committed.
+sessions/
+
+# The speech engine and its voice models are downloaded, not authored.
+# ~100 MB; see the Voices section of the README to fetch them again.
+vendor/
+voices/
+models/
+
+# The audit log of what Nim did on this machine. Local, and yours.
+logs/
+
+# Facts you asked Nim to remember. Yours, local, and never committed.
+memory/
+
+# Your own settings: your name, city, voice, automations, the spellings of
+# "Hey Nim" learned from your voice. Created on first run; never committed.
+config.json
+
+# Development leftovers and local tool settings.
+prototypes/
+.claude/
+tools/
