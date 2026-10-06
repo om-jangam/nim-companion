@@ -1,12 +1,48 @@
+<div align="center">
+
 # Nim
 
-A companion that lives on your Windows desktop: a small glass creature that
-floats above whatever you are doing, listens for its name, talks back, and uses
-the computer for you.
+**A voice-controlled AI companion that lives on your Windows desktop.**
 
-Everything Nim thinks with runs on this computer - its rules, Qwen through
-Ollama, Whisper for hearing, Kokoro (or Piper) for its voice. There is no
-account, no API key and no paid service anywhere in it.
+It listens for its name, talks back in a human-like voice, uses your PC for you,
+dances to your music and looks after you - and everything it thinks with runs on
+your own computer. No account, no API key, no paid service.
+
+![Windows 10 and 11](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?logo=windows&logoColor=white)
+![AI runs on your PC](https://img.shields.io/badge/AI-runs%20on%20your%20PC-8A7DFF)
+![License: MIT](https://img.shields.io/badge/license-MIT-6EE7A8)
+![Tests](https://img.shields.io/badge/tests-669%20passing-5FD8FF)
+
+<img src="docs/images/hero.png" alt="Nim on the desktop, starting study mode" width="100%">
+
+</div>
+
+<table>
+<tr>
+<td width="50%"><img src="docs/images/dance.png" alt="Nim dancing with headphones, the lyric in its goggles"></td>
+<td width="50%"><img src="docs/images/colours.png" alt="Nim's eight colour styles"></td>
+</tr>
+<tr>
+<td><b>Dances to your music.</b> Finds the beat, sings along with the lyrics in its goggles, and has play, pause, skip and volume on its belly. Songs only - never ads, talk or a match with commentary.</td>
+<td><b>Eight colour styles.</b> Glossy glass in Aurora, Ocean, Candy, Sunset, Mint, Lilac, Rose or Midnight, a small size, and see-through while you work so it is never in your way.</td>
+</tr>
+<tr>
+<td><img src="docs/images/automations.png" alt="The automations in Settings"></td>
+<td><img src="docs/images/settings.png" alt="Voice, music and wellbeing settings"></td>
+</tr>
+<tr>
+<td><b>Automations.</b> Routines ("study mode"), schedules, and triggers - lock the PC and the music pauses, a download finishes and Nim tells you. It can even learn your habits and offer to do them.</td>
+<td><b>Everything in one place.</b> 27 human-like voices, speaking speed, dancing and lyrics, health breaks, PC warnings, the clipboard helper and game mode - each a switch.</td>
+</tr>
+</table>
+
+### What it does
+
+- **Talk to it** - "Hey Nim, open Spotify", "remind me in 20 minutes to stretch", "what is 15 percent of 2400", "write a two line poem about rain".
+- **Uses your computer** - apps, files and folders, web search and reading pages, screenshots, volume and media, reminders and notes.
+- **Thinks on your PC** - fixed rules for everyday commands, [Qwen](https://ollama.com/library/qwen2.5) through Ollama for everything else, Whisper for hearing, Kokoro for a human-like voice.
+- **Looks after you** - a focus timer, health breaks, PC health warnings, a morning briefing with the weather, a clipboard helper (summarize, translate, fix grammar) and quizzes to study with.
+- **Safe by design** - every plan is checked before it runs; anything risky asks you first; it never types into a command line, never reaches your local network, never writes or opens a program. See [Safety](#safety).
 
 ```
 microphone -> "Hey Nim" (Whisper) -> rules, or Qwen (Ollama) -> plan
